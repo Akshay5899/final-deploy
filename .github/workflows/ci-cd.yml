@@ -1,67 +1,15 @@
-name: CI/CD
+version: 0.2
 
-on:
-  push:
-  pull_request:
+phases:
+  install:
+    commands:
+      - npm ci
 
-permissions:
-  contents: read
-
-jobs:
   build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+    commands:
+      - npm run build
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build app
-        run: npm run build
-
-      - name: Upload production build
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-build
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
-
-  deploy:
-    name: Deploy to AWS
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Download production build
-        uses: actions/download-artifact@v4
-        with:
-          name: production-build
-          path: dist/
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ap-southeast-2
-
-      - name: Sync site to S3
-        env:
-          AWS_S3_BUCKET: deploy-ci-cd-demo
-        run: aws s3 sync dist/ "s3://$AWS_S3_BUCKET" --delete
-
-      - name: Invalidate CloudFront cache
-        env:
-          AWS_CLOUDFRONT_DISTRIBUTION_ID: E3BU6LA4PZ80L7
-        run: aws cloudfront create-invalidation --distribution-id "$AWS_CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+artifacts:
+  base-directory: dist
+  files:
+    - '**/*'
