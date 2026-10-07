@@ -112,6 +112,9 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: vercel deploy --prod --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
 
+      - name: Verify production site
+        run: curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 5 --max-time 20 https://deploy-ci-cd-three.vercel.app/
+
   deploy-netlify:
     name: Deploy to Netlify
     needs: build

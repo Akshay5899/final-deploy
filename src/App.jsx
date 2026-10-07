@@ -85,7 +85,7 @@ function App() {
           <div>
             <p className="eyebrow">Your next release starts here</p>
             <h1 id="hero-title">
-              Ship faster.
+              Ship fasters.
               <br />
               <span>Worry less.</span>
             </h1>
