@@ -1,10 +1,7 @@
-name: CI/CD
+name: React CI/CD to AWS S3
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
   workflow_dispatch:
@@ -13,104 +10,31 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app
+      - name: Build React application
         run: npm run build
-
-      - name: Upload production build
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-build
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
-
-  deploy-aws:
-    name: Deploy to AWS
-    needs: build
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Download production build
-        uses: actions/download-artifact@v4
-        with:
-          name: production-build
-          path: dist/
-
-      - name: Check AWS role configuration
-        env:
-          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-        run: |
-          if [ -z "$AWS_ROLE_ARN" ]; then
-            echo "::error::Add the AWS_ROLE_ARN Actions secret before deploying to AWS."
-            exit 1
-          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-southeast-2
 
-      - name: Sync site to S3
-        run: aws s3 sync dist/ s3://deploy-ci-cd-demo --delete
-
-      - name: Invalidate CloudFront cache
-        run: aws cloudfront create-invalidation --distribution-id E3BU6LA4PZ80L7 --paths "/*"
-
-  deploy-vercel:
-    name: Deploy to Vercel
-    needs: build
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Check Vercel configuration
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "::error::Add VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID Actions secrets before deploying to Vercel."
-            exit 1
-          fi
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel
-
-      - name: Link Vercel project
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
-
-      - name: Deploy to production
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        run: vercel deploy --prod --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
-
-      - name: Verify production site
-        run: curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 5 --max-time 20 https://deploy-ci-cd-three.vercel.app/
+      - name: Deploy to S3
+        run: aws s3 sync ./dist s3://YOUR_BUCKET_NAME --delete
